@@ -1,3 +1,6 @@
+---
+description: 'This is the oficial prompt for generating GitHub Copilot Instructions. For complex scenarios, use it to generate the STRUCTURE.md and keep copilot-instructions.md small.'
+---
 Analyze this codebase to generate or update `.github/copilot-instructions.md` for guiding AI coding agents.
 
 Focus on discovering the essential knowledge that would help an AI agents be immediately productive in this codebase. Consider aspects like:
