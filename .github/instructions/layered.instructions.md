@@ -1,15 +1,41 @@
-# Arquitectura en capas
+---
+description: 'Layered architecture rules (Presentation/Business/Persistence)'
+applyTo: '**/*.cs'
+---
 
-Este proyecto sigue una arquitectura en capas, que separa las responsabilidades en diferentes niveles para mejorar la mantenibilidad y escalabilidad del código. A continuación se describen las capas principales:
+# Arquitectura en capas (3 capas)
 
-1. **Capa de Presentación (UI)**: Esta capa es responsable de la interacción con el usuario. Incluye componentes como handlers de endpoint HTTP. Su función principal es recibir las entradas del usuario y mostrar los resultados.
+Este proyecto sigue una arquitectura en capas para separar responsabilidades y mantener el dominio fácil de evolucionar.
 
-Se guarda en la carpeta `presentation`.
+## Capas
 
-2. **Capa de Negocio (Lógica de Negocio)**: Esta capa contiene la lógica de negocio de la aplicación. Aquí es donde se procesan las solicitudes recibidas de la capa de presentación, se aplican las reglas de negocio y se coordinan las operaciones entre la capa de presentación y la capa de persistencia. Se crean clases de tipo Service para encapsular esta lógica.
+1. **Presentation (HTTP)**
+	- Endpoints Minimal API, DTO mapping y mapeo de status codes.
+	- No contiene reglas de negocio.
+	- Ubicación: `lib/Presentation/`
 
-Se guarda en la carpeta `business`.
+2. **Business (dominio y orquestación)**
+	- Reglas del dominio (validación, transiciones de estado, pricing, etc.).
+	- Orquesta llamadas a repositorios a través de **abstracciones**.
+	- Ubicación: `lib/Business/`
 
-3. **Capa de Persistencia (Acceso a Datos)**: Esta capa se encarga de la gestión y almacenamiento de datos. Por ahora utiliza repositorios en memoria para almacenar los datos, pero en el futuro podría integrarse con bases de datos u otros sistemas de almacenamiento. Las clases de tipo Repository se encuentran en esta capa.
+3. **Persistence (almacenamiento)**
+	- Implementaciones de repositorios (por defecto: en memoria).
+	- No conoce HTTP ni DTOs.
+	- Ubicación: `lib/Persistence/`
 
-Se guarda en la carpeta `persistence`.
+## Dirección de dependencias (regla clave)
+
+- Presentation → Business → Persistence (abstracciones)
+- Persistence **no** depende de Presentation.
+
+## Contratos
+
+- DTOs en `lib/Dtos/` (request/response).
+- Modelos de dominio en `lib/Models/`.
+- Presentation convierte DTOs ⇄ modelos y traduce resultados del dominio a HTTP.
+
+## Manejo de errores
+
+- No uses excepciones para flujos esperados (validación, not-found, conflicts).
+- Business retorna resultados explícitos; Presentation mapea a `400/404/409`.

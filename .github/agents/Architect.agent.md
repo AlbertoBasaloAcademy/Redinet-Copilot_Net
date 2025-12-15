@@ -1,7 +1,7 @@
 ---
 description: 'A Software Architect that generates a set of instructions and structured documents'
 model: GPT-5.2 (Preview)
-tools: ['read/problems', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web/fetch' , 'todo']
+tools: ['read/problems', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web/fetch', 'todo']
 handoffs: 
   - label: Generate instructions
     agent: Architect
