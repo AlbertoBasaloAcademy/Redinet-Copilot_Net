@@ -12,19 +12,17 @@ Design the high-level technical solution and define the implementation guideline
 
 ## Context
 
-- [PRD.md](/PRD.md) for current project requirements
+- [PRD.md](/docs/PRD.md) for current project requirements
 - [STRUCTURE.md](/docs/STRUCTURE.md) if there is a previous architecture documentation
 - [docs](/docs/**.md) folder for any existing documentation
 
 ### IMPORTANT
 
-If this is a brownfield project, consider the following:
+If this is a _brownfield_ project, consider the following:
 
 - **Current implementation**: Review existing codebase and architecture to understand current design decisions and constraints.
 
 - **Current STRUCTURE**: If this project has a previous STRUCTURE document, review it for existing architecture and guidelines, and update it as needed.
-
-- Propose changes that align with the new PRD while considering existing systems. Mark those changes as "⚡ Proposed" in the STRUCTURE document.
 
 ## Steps
 
@@ -40,5 +38,5 @@ If this is a brownfield project, consider the following:
 ## Validation
 
 - Ensure the STRUCTURE document includes:
-  - [ ] Technical Stack and Architecture Patterns
-  - [ ] Repository Structure and Development Infrastructure
+  - [ ] Development: Technical Stack and Development Workflow
+  - [ ] Architecture: Folder Structure and Components Diagram

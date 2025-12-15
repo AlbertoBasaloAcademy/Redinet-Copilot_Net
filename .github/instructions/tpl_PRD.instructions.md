@@ -15,6 +15,13 @@ Product Requirements Document for { Product name }
 
 - { Goal 1 short description }
 
+### Context diagram
+
+```mermaid
+C4Context
+  { The Level 1 diagram following the C4 model }
+```
+
 ## Functional Requirements
 
 ### { FR1 } { Functional Requirement 1 short title }
@@ -26,12 +33,5 @@ Product Requirements Document for { Product name }
 ### { TR1 } { Technical Requirement 1 short title }
 
 { Brief paragraph description of the technical requirement 1 }
-
-## Context diagram
-
-```mermaid
-C4Context
-  { The Level 1 diagram following the C4 model }
-```
 
 > End of PRD for { PRODUCT_NAME }, last updated on { DATE }.
