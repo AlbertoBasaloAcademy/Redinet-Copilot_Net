@@ -20,11 +20,10 @@ Analyze the product requirements and generate a comprehensive Product Requiremen
 
 1. Define 
   - product scope, 
-  - goals (up to 3 main goals),
-  - success criteria
+  - goals [2,3]
 2. Identify 
-  - functional requirements (up to 9),
-  - technical constraints (up to 5)
+  - functional requirements [3,9],
+  - technical constraints [2,5]
 3. Write them in a formal format at [/docs/PRD.md](/docs/PRD.md)
 
 ## Validation

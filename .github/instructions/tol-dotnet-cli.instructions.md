@@ -1,6 +1,5 @@
 ---
 description: 'dotnet CLI workflow (build/run/format/test)'
-applyTo: '**/*'
 ---
 
 # dotnet CLI workflow
