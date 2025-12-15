@@ -1,72 +1,115 @@
-## Estructura y cómo compilar/ejecutar
+# AstroBookings STRUCTURE
 
-Resumen rápido
-- **Proyecto:** `Redinet-Copilot_Net`
-- **Target framework:** `net9.0` (según la salida en `bin/` y `obj/`).
+Structure Document for AstroBookings
 
-Pasos para compilar y ejecutar (Windows, usando `bash.exe` o WSL)
+## Overview
 
-1. Abrir una terminal en el directorio raíz del repo:
+**AstroBookings** is a workshop-oriented REST backend that demonstrates a clean layered architecture by implementing a simplified space-travel booking domain.
+
+The PRD scope covers **Rockets**, **Flights**, and **Bookings** with deterministic, in-memory persistence and minimal dependencies so participants can run the full flow locally.
+
+**Current implementation status (brownfield):** the repository currently implements the Rocket slice (create rocket) and the foundational layering (Presentation/Business/Persistence). Flights and bookings are not yet implemented and are listed below as **⚡ Proposed** additions.
+
+## Technical Stack and Architecture Patterns
+
+### Technical Stack
+
+- **Runtime:** .NET 9 (`net9.0`), C# 12
+- **Web:** ASP.NET Core Minimal APIs (`WebApplication`)
+- **DI & configuration:** built-in dependency injection + `appsettings.json` / `appsettings.Development.json`
+- **Logging/observability:** `Microsoft.Extensions.Logging` (console)
+- **Persistence (default):** in-memory repositories (e.g., `ConcurrentDictionary`) to avoid external infrastructure
+
+### Architecture Patterns
+
+- **Layered architecture (3 layers):**
+  - **Presentation**: HTTP endpoints, DTO mapping, and HTTP status mapping.
+  - **Business**: domain rules and orchestration (validation, state transitions, pricing).
+  - **Persistence**: repositories and storage abstractions.
+- **Dependency direction:** Presentation depends on Business, Business depends on Persistence abstractions; Persistence has no dependency on Presentation.
+- **Deterministic domain orchestration:** business services are responsible for enforcing PRD rules (capacity, thresholds, discount precedence, flight state transitions) and returning domain outcomes that Presentation maps to HTTP responses.
+
+## Development Workflow
 
 ```bash
-cd /c/code/live/Redinet-Copilot_Net
+# Build + run
+dotnet build
+dotnet run
+
+# Formatting (recommended)
+dotnet format
+
+# Tests (when added)
+dotnet test
 ```
 
-2. Restaurar paquetes (opcional, `dotnet build` lo hace automáticamente si falta):
+- Use short-lived branches (e.g., `feature/*`, `fix/*`) and merge via pull requests.
+- Keep changes small and aligned with PRD rules; reviewers verify business rules and HTTP semantics.
+- Prefer Conventional Commits for message consistency (`feat:`, `fix:`, `docs:`), using an issue number when applicable.
 
-```bash
-dotnet restore
+## Architecture
+
+`Program.cs` bootstraps the Minimal API app, registers dependencies, and maps endpoints.
+
+- **Presentation** defines endpoint mapping extensions (e.g., rockets) and converts request DTOs into calls to business services.
+- **Business** performs validation and constructs domain models, then delegates to repositories.
+- **Persistence** implements in-memory repositories for local-first execution.
+
+### Folder Structure
+
+Main folders and their purposes:
+
+```
+Redinet-Copilot_Net/
+├── Program.cs                # App bootstrap: DI + endpoint mapping
+├── appsettings*.json         # Environment-based configuration
+├── lib/
+│   ├── Presentation/         # Minimal API endpoints and HTTP concerns
+│   ├── Business/             # Domain orchestration and policies
+│   ├── Persistence/          # In-memory repositories (default)
+│   ├── Dtos/                 # Request/response contracts
+│   └── Models/               # Domain entities and enums
+└── docs/                     # PRD and architecture docs
 ```
 
-3. Compilar el proyecto:
+### Components diagram
 
-```bash
-dotnet build -c Debug
+```mermaid
+C4Container
+  title AstroBookings - Containers
+
+  Person(traveler, "Traveler", "Browses flights and makes bookings")
+  Person(operator, "Operator", "Operator", "Schedules/cancels flights and manages catalog")
+
+  System_Boundary(astro_boundary, "AstroBookings") {
+    Container(presentation, "Presentation", "ASP.NET Core Minimal API", "HTTP endpoints, DTO mapping, status code mapping")
+    Container(business, "Business", "C# services", "Domain rules: validation, pricing, state transitions")
+    Container(persistence, "Persistence", "In-memory repositories", "Stores rockets/flights/bookings (default: in-memory)")
+  }
+
+  System_Ext(console, "Console Output (mock)", "Mock notification/refund channel")
+
+  Rel(traveler, presentation, "Uses", "HTTPS/JSON")
+  Rel(operator, presentation, "Uses", "HTTPS/JSON")
+  Rel(presentation, business, "Invokes", "DI")
+  Rel(business, persistence, "Reads/Writes")
+  Rel(business, console, "Writes events", "Console")
 ```
 
-4. Ejecutar la aplicación (desde la carpeta raíz):
+## Development Infrastructure
 
-```bash
-dotnet run --project Redinet-Copilot_Net.csproj
-```
+- **Local execution:** `dotnet run` (no DB, no auth provider)
+- **Configuration:** `appsettings.json` + environment override via `ASPNETCORE_ENVIRONMENT=Development`
+- **Logging:** console logging via `Microsoft.Extensions.Logging` (also used for mocked notifications/payments/refunds)
 
-5. Probar el endpoint POST `/rockets` (ejemplo con `curl`):
+## ⚡ Proposed (to satisfy remaining PRD scope)
 
-```bash
-curl -i -X POST http://localhost:5000/rockets \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Explorer","capacity":4,"range":"LEO"}'
-```
+- ⚡ Proposed: Add **Flight** and **Booking** endpoints in `lib/Presentation` with consistent error mapping (400/404/409/500) per TR4.
+- ⚡ Proposed: Add `FlightService` and `BookingService` in `lib/Business` to implement FR3–FR9:
+  - state machine: `SCHEDULED` → `CONFIRMED` (min threshold) → `SOLD_OUT` (capacity)
+  - discount precedence rules for final price
+  - explicit cancellation + automated cancellation within 1 week when threshold unmet
+- ⚡ Proposed: Add in-memory repositories for flights and bookings in `lib/Persistence`.
+- ⚡ Proposed: Introduce an `ITimeProvider` abstraction for deterministic tests and time-based cancellation policy.
 
-Si la aplicación está escuchando en otro puerto (por ejemplo Kestrel asigna automáticamente), consulte la salida del `dotnet run` para la URL.
-
-Descripción de la solución
-
-Esta solución es una API mínima ASP.NET que permite crear cohetes (rockets). La lógica está dividida en capas sencillas dentro de la carpeta `lib/`:
-
-- `lib/Models` : modelos de dominio. Contiene `Rocket` y el enum `RocketRange`.
-- `lib/Dtos` : objetos de transferencia (DTOs) para entrada y salida (`RocketDto`, `RocketResponseDto`).
-- `lib/Persistence` : repositorio en memoria (`InMemoryRocketRepository`) que asigna un Id secuencial al crear cohetes.
-- `lib/Business` : lógica de negocio (`RocketService`) que valida DTOs y usa el repositorio.
-- `lib/Presentation` : mapeo de endpoints HTTP (`RocketEndpoints`) que exponen el endpoint `POST /rockets`.
-
-Ficheros importantes en la raíz
-
-- `Program.cs` : arranque de la aplicación, configuración de DI y llamada a los mapeos de endpoints.
-- `Redinet-Copilot_Net.csproj` : archivo de proyecto .NET.
-- `appsettings.json` / `appsettings.Development.json` : configuración de la aplicación.
-
-Notas sobre el comportamiento
-
-- El repositorio en memoria usa `ConcurrentDictionary` y genera Ids en formato `r0001`, `r0002`, ...
-- `RocketService` valida: `Name` no vacío, `Capacity` en rango (1..10), y `Range` debe poder parsearse al enum `RocketRange` (acepta "LEO", "Moon", "Mars", case-insensitive).
-- Si la creación tiene éxito, el endpoint devuelve `201 Created` con el `RocketResponseDto`.
-
-Cómo extender o probar localmente
-
-- Para persistencia real, sustituir `InMemoryRocketRepository` por una implementación que use base de datos y registrar en DI.
-- Añadir más endpoints (GET, PUT, DELETE) en `lib/Presentation/RocketEndpoints.cs`.
-
-Contacto y próximos pasos
-
-- Si quieres, puedo: ejecutar `dotnet build` aquí, añadir más endpoints, o crear pruebas unitarias para `RocketService`.
+> End of STRUCTURE document for AstroBookings, last updated on 2025-12-15.
