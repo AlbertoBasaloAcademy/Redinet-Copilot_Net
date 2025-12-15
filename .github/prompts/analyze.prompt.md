@@ -13,7 +13,7 @@ Analyze the product requirements and generate a comprehensive Product Requiremen
 ## Context
 
 - [README.md](/README.md) for current project overview
-- [docs](/docs/**.md) folder for any existing documentation
+- [docs](/docs/**.md) folder for any existing documentation (specifically look for briefings or requirement docs)
 - Ask the user for any specific briefing or context related to the product.
 
 ## Steps
