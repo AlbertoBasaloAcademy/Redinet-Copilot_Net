@@ -24,6 +24,7 @@ Implemented Flight endpoints:
 Implemented Booking endpoints:
 
 - `POST /flights/{flightId}/bookings` creates a booking for a flight.
+- `GET /flights/{flightId}/bookings` lists bookings for a flight.
 
 ## Architecture
 
