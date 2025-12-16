@@ -1,6 +1,6 @@
 ---
-description: 'Design the technical solution and guidelines to implement the product based on the PRD.'
 agent: Architect
+description: 'Design the technical solution and guidelines to implement the product based on the PRD.'
 argument-hint: 'Provide the Product Requirements Document (PRD) or relevant context.'
 ---
 

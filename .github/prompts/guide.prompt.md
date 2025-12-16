@@ -1,6 +1,6 @@
 ---
-description: 'Guid the implementation process by creating instruction files for project technology stack.'
 agent: Architect
+description: 'Guid the implementation process by creating instruction files for project technology stack.'
 argument-hint: 'Provide the STRUCTURE document or relevant context.'
 ---
 
@@ -33,9 +33,9 @@ Generate comprehensive instruction files for each tech stack item and architectu
 
 For each missing instruction file:
 
-- [ ] Use #fetch tool to visit and read the [copilot custom instructions catalog](https://github.com/github/awesome-copilot/blob/main/docs/README.instructions.md)
-- [ ] Use #fetch tool to research the official documentation and best practices for the technology item
-- [ ] Use #fetch tool to ask in Google for instructions, rules or other LLM best practices
+- [ ] Use #web/fetch tool to visit and read the [copilot custom instructions catalog](https://github.com/github/awesome-copilot/blob/main/docs/README.instructions.md)
+- [ ] Choose the most relevant instruction file as a base template
+- [ ] Use #web/fetch tool to research the documentation and best practices for the technology item
 - [ ] Summarize (less than 250 lines) findings and create a draft for the instruction file.
 
 ### 3. File Creation

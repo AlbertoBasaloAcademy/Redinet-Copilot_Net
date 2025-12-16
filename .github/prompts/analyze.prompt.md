@@ -1,6 +1,6 @@
 ---
-description: 'Analyze the requirements of the product and generate a PRD.'
 agent: Analyst
+description: 'Analyze the requirements of the product and generate a PRD.'
 argument-hint: 'Provide the product name and any specific briefing or context.'
 ---
 
@@ -15,6 +15,14 @@ Analyze the product requirements and generate a comprehensive Product Requiremen
 - [README.md](/README.md) for current project overview
 - [docs](/docs/**.md) folder for any existing documentation (specifically look for briefings or requirement docs)
 - Ask the user for any specific briefing or context related to the product.
+
+### IMPORTANT
+
+If this is a _brownfield_ project, consider the following:
+
+- **Current implementation**: Review existing codebase to understand current features and technical restrictions.
+
+- **Current PRD**: If this project has a previous PRD document, review it for existing features, and update it as needed.
 
 ## Steps
 
