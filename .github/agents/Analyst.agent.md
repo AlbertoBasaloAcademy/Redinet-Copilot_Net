@@ -7,6 +7,14 @@ handoffs:
     agent: Architect
     prompt: 'Design the high-level system architecture based on the provided requirements.'
     send: true
+  - label: Specify a Feature
+    agent: Analyst
+    prompt: /specify the next feature from the PRD.md file
+    send: true
+  - label: Implement the Specified Feature
+    agent: Plan
+    prompt: /code the latest specified feature from the PRD.md file
+    send: true
 ---
 
 # Analyst Mode
