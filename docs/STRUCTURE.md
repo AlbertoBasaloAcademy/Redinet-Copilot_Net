@@ -14,6 +14,11 @@ Implemented Rocket endpoints:
 - `GET /rockets` lists all rockets.
 - `GET /rockets/{id}` retrieves a rocket by id.
 
+Implemented Flight endpoints:
+
+- `POST /flights` creates a flight.
+- `GET /flights` lists only future flights (optional `?state={state}` filter).
+
 ## Architecture
 
 ### Architecture style
