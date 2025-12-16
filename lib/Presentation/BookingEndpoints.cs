@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Threading.Tasks;
 using NetAstroBookings.Business;
 using NetAstroBookings.Dtos;
@@ -22,8 +23,26 @@ namespace NetAstroBookings.Presentation
       var group = endpoints.MapGroup("/flights");
 
       group.MapPost("/{flightId}/bookings", CreateBooking);
+      group.MapGet("/{flightId}/bookings", ListBookings);
 
       return endpoints;
+    }
+
+    private static async Task<IResult> ListBookings(
+      [FromRoute] string flightId,
+      [FromServices] BookingService service)
+    {
+      var result = await service.ListByFlightIdAsync(flightId);
+      return result switch
+      {
+        BookingService.ListBookingsResult.Success success =>
+          TypedResults.Ok(success.Bookings.Select(Map).ToList()),
+
+        BookingService.ListBookingsResult.FlightNotFound =>
+          TypedResults.NotFound(),
+
+        _ => TypedResults.StatusCode(StatusCodes.Status500InternalServerError)
+      };
     }
 
     private static async Task<IResult> CreateBooking(

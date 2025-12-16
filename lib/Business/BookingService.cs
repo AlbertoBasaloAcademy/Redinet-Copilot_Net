@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -174,6 +175,37 @@ namespace NetAstroBookings.Business
       return new CreateBookingResult.Success(created);
     }
 
+    /// <summary>
+    /// Lists all bookings for a flight.
+    /// Returns <see cref="ListBookingsResult.FlightNotFound"/> when the flight does not exist.
+    /// </summary>
+    /// <param name="flightId">Flight identifier.</param>
+    /// <returns>A result describing either success or not found.</returns>
+    public async Task<ListBookingsResult> ListByFlightIdAsync(string flightId)
+    {
+      if (string.IsNullOrWhiteSpace(flightId))
+      {
+        _logger.LogWarning("Rejected list bookings request because flightId is empty");
+        return new ListBookingsResult.FlightNotFound();
+      }
+
+      var flight = await _flightRepository.GetByIdAsync(flightId);
+      if (flight is null)
+      {
+        _logger.LogWarning("Flight {FlightId} not found while listing bookings", flightId);
+        return new ListBookingsResult.FlightNotFound();
+      }
+
+      var bookings = await _bookingRepository.ListByFlightIdAsync(flightId);
+
+      _logger.LogInformation(
+        "Listed bookings for flight {FlightId}. Count={BookingCount}",
+        flightId,
+        bookings.Count);
+
+      return new ListBookingsResult.Success(bookings);
+    }
+
     private enum DiscountRule
     {
       LastSeat,
@@ -233,6 +265,27 @@ namespace NetAstroBookings.Business
       /// Successful booking creation outcome.
       /// </summary>
       public sealed record Success(Booking Booking) : CreateBookingResult;
+    }
+
+    /// <summary>
+    /// Result type for booking list operations.
+    /// </summary>
+    public abstract record ListBookingsResult
+    {
+      /// <summary>
+      /// Outcome when the referenced flight does not exist.
+      /// </summary>
+      public sealed record FlightNotFound : ListBookingsResult;
+
+      /// <summary>
+      /// Successful booking list outcome.
+      /// </summary>
+      public sealed record Success(IReadOnlyList<Booking> Bookings) : ListBookingsResult;
+
+      /// <summary>
+      /// Unexpected failure outcome.
+      /// </summary>
+      public sealed record UnexpectedFailure(string Error) : ListBookingsResult;
     }
 
     private static CreateBookingResult ValidateDto(string flightId, CreateBookingDto dto)
