@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NetAstroBookings.Models;
@@ -28,6 +30,20 @@ namespace NetAstroBookings.Persistence
       _store[id] = persisted;
 
       return Task.FromResult(Clone(persisted));
+    }
+
+    /// <summary>
+    /// Returns a snapshot list of all flights.
+    /// </summary>
+    public Task<IReadOnlyList<Flight>> ListAsync()
+    {
+      var snapshot = _store.Values
+        .Select(Clone)
+        .OrderBy(f => f.LaunchDate)
+        .ThenBy(f => f.Id, StringComparer.Ordinal)
+        .ToList();
+
+      return Task.FromResult<IReadOnlyList<Flight>>(snapshot);
     }
 
     /// <summary>
