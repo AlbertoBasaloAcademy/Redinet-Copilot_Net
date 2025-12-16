@@ -1,6 +1,5 @@
 ---
-agent: agent
-model: GPT-5.2 (Preview)
+agent: Analyst
 description: 'Write the specification for a feature.'
 argument-hint: 'Provide the PRD and STRUCTURE documents and the feature to be specified.'
 ---
