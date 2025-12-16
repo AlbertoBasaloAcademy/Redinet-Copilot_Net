@@ -40,7 +40,7 @@ For each missing instruction file:
 
 ### 3. File Creation
 
-Create instruction files at [/.github/instructions](../instructions) folder following this naming convention: `{type}-{name}.instructions.md`
+Create instruction files at [/.github/instructions](../instructions) folder following this naming convention: `{type}_{name}.instructions.md`
 
 Type can be:
 - `lng` for languages
