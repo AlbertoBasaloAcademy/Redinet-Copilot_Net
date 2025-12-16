@@ -21,7 +21,6 @@ Write detailed specifications for a prompted feature in Markdown format composed
 
 - [PRD.md](/docs/PRD.md)
 - [STRUCTURE.md](/docs/STRUCTURE.md)
-- [Architecture Instructions](../instructions/bst_architecture.instructions.md)
 - [Feature Specification Template](../instructions/tpl_feature-spec.instructions.md)
 
 ## Steps
