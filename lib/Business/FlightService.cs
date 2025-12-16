@@ -18,7 +18,9 @@ namespace NetAstroBookings.Business
     private const int DefaultMinimumPassengers = 5;
 
     private readonly IFlightRepository _flightRepository;
+    private readonly IBookingRepository _bookingRepository;
     private readonly IRocketRepository _rocketRepository;
+    private readonly IFlightOperationGate _operationGate;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<FlightService> _logger;
 
@@ -31,14 +33,151 @@ namespace NetAstroBookings.Business
     /// <param name="logger">Logger instance.</param>
     public FlightService(
       IFlightRepository flightRepository,
+      IBookingRepository bookingRepository,
       IRocketRepository rocketRepository,
+      IFlightOperationGate operationGate,
       TimeProvider timeProvider,
       ILogger<FlightService> logger)
     {
       _flightRepository = flightRepository;
+      _bookingRepository = bookingRepository;
       _rocketRepository = rocketRepository;
+      _operationGate = operationGate;
       _timeProvider = timeProvider;
       _logger = logger;
+    }
+
+    /// <summary>
+    /// Marks an existing flight as cancelled.
+    /// This operation is idempotent; calling it multiple times will not trigger duplicate workflows.
+    /// </summary>
+    /// <param name="flightId">Flight identifier.</param>
+    /// <returns>A result describing either success, not found, a conflict, or an unexpected failure.</returns>
+    public async Task<FlightOperationResult> CancelAsync(string flightId)
+    {
+      if (string.IsNullOrWhiteSpace(flightId))
+      {
+        return new FlightOperationResult.NotFound();
+      }
+
+      await using var gate = await _operationGate.AcquireAsync(flightId);
+
+      var flight = await _flightRepository.GetByIdAsync(flightId);
+      if (flight is null)
+      {
+        return new FlightOperationResult.NotFound();
+      }
+
+      if (flight.State == FlightState.CANCELLED)
+      {
+        _logger.LogInformation("Cancel requested for flight {FlightId} but it is already CANCELLED", flightId);
+        return new FlightOperationResult.Success(flight);
+      }
+
+      if (flight.State == FlightState.DONE)
+      {
+        _logger.LogWarning(
+          "Rejected cancel transition for flight {FlightId}. State={State} Reason={Reason}",
+          flightId,
+          flight.State,
+          "cannot cancel a performed flight");
+
+        return new FlightOperationResult.Conflict("flight cannot be cancelled because it is already DONE");
+      }
+
+      var fromState = flight.State;
+      flight.State = FlightState.CANCELLED;
+
+      var updated = await _flightRepository.UpdateAsync(flight);
+      if (updated is null)
+      {
+        _logger.LogError("Failed to cancel flight {FlightId}", flightId);
+        return new FlightOperationResult.UnexpectedFailure("failed to cancel flight");
+      }
+
+      var bookingCount = await _bookingRepository.CountByFlightIdAsync(flightId);
+      var rocket = await _rocketRepository.GetByIdAsync(updated.RocketId);
+      var capacity = rocket?.Capacity ?? -1;
+
+      _logger.LogInformation(
+        "Flight {FlightId} transitioned from {FromState} to {ToState}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
+        flightId,
+        fromState,
+        updated.State,
+        bookingCount,
+        updated.MinimumPassengers,
+        capacity);
+
+      _logger.LogInformation(
+        "Triggering cancellation notification/refund workflow for flight {FlightId}. BookingCount={BookingCount}",
+        flightId,
+        bookingCount);
+
+      return new FlightOperationResult.Success(updated);
+    }
+
+    /// <summary>
+    /// Marks an existing flight as performed (done).
+    /// This operation is idempotent.
+    /// </summary>
+    /// <param name="flightId">Flight identifier.</param>
+    /// <returns>A result describing either success, not found, a conflict, or an unexpected failure.</returns>
+    public async Task<FlightOperationResult> PerformAsync(string flightId)
+    {
+      if (string.IsNullOrWhiteSpace(flightId))
+      {
+        return new FlightOperationResult.NotFound();
+      }
+
+      await using var gate = await _operationGate.AcquireAsync(flightId);
+
+      var flight = await _flightRepository.GetByIdAsync(flightId);
+      if (flight is null)
+      {
+        return new FlightOperationResult.NotFound();
+      }
+
+      if (flight.State == FlightState.DONE)
+      {
+        _logger.LogInformation("Perform requested for flight {FlightId} but it is already DONE", flightId);
+        return new FlightOperationResult.Success(flight);
+      }
+
+      if (flight.State == FlightState.CANCELLED)
+      {
+        _logger.LogWarning(
+          "Rejected perform transition for flight {FlightId}. State={State} Reason={Reason}",
+          flightId,
+          flight.State,
+          "cannot perform a cancelled flight");
+
+        return new FlightOperationResult.Conflict("flight cannot be performed because it is CANCELLED");
+      }
+
+      var fromState = flight.State;
+      flight.State = FlightState.DONE;
+
+      var updated = await _flightRepository.UpdateAsync(flight);
+      if (updated is null)
+      {
+        _logger.LogError("Failed to mark flight {FlightId} as DONE", flightId);
+        return new FlightOperationResult.UnexpectedFailure("failed to mark flight as DONE");
+      }
+
+      var bookingCount = await _bookingRepository.CountByFlightIdAsync(flightId);
+      var rocket = await _rocketRepository.GetByIdAsync(updated.RocketId);
+      var capacity = rocket?.Capacity ?? -1;
+
+      _logger.LogInformation(
+        "Flight {FlightId} transitioned from {FromState} to {ToState}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
+        flightId,
+        fromState,
+        updated.State,
+        bookingCount,
+        updated.MinimumPassengers,
+        capacity);
+
+      return new FlightOperationResult.Success(updated);
     }
 
     /// <summary>
@@ -166,6 +305,32 @@ namespace NetAstroBookings.Business
       /// Successful list outcome.
       /// </summary>
       public sealed record Success(IReadOnlyList<Flight> Flights) : ListFlightsResult;
+    }
+
+    /// <summary>
+    /// Result type for operational flight transitions.
+    /// </summary>
+    public abstract record FlightOperationResult
+    {
+      /// <summary>
+      /// Successful transition (or idempotent no-op) outcome.
+      /// </summary>
+      public sealed record Success(Flight Flight) : FlightOperationResult;
+
+      /// <summary>
+      /// Outcome when the referenced flight does not exist.
+      /// </summary>
+      public sealed record NotFound : FlightOperationResult;
+
+      /// <summary>
+      /// Conflict outcome when the requested transition is invalid.
+      /// </summary>
+      public sealed record Conflict(string Error) : FlightOperationResult;
+
+      /// <summary>
+      /// Unexpected failure outcome.
+      /// </summary>
+      public sealed record UnexpectedFailure(string Error) : FlightOperationResult;
     }
 
     private CreateFlightResult ValidateDto(CreateFlightDto dto)

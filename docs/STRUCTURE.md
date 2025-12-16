@@ -18,6 +18,8 @@ Implemented Flight endpoints:
 
 - `POST /flights` creates a flight.
 - `GET /flights` lists only future flights (optional `?state={state}` filter).
+- `POST /flights/{flightId}/cancel` cancels a flight (workshop/admin operation).
+- `POST /flights/{flightId}/perform` marks a flight as done (workshop/admin operation).
 
 Implemented Booking endpoints:
 
@@ -53,7 +55,7 @@ Implemented Booking endpoints:
 
 - **Logging**: use `ILogger<T>` with structured templates. Log state transitions and workflow triggers (notifications/refunds) at `Information`, validation/conflicts at `Warning`, unexpected failures at `Error`.
 - **Configuration**: use `appsettings.json` + `appsettings.{Environment}.json` and the options pattern for strongly-typed settings.
-- **Concurrency**: repositories must be safe for concurrent access (e.g., `ConcurrentDictionary` + atomic operations).
+- **Concurrency**: repositories must be safe for concurrent access (e.g., `ConcurrentDictionary` + atomic operations). Cross-entity operations that must be consistent (booking creation + flight state transitions, admin transitions) are serialized per flight using a shared async gate in Business.
 
 ### Rockets (current shape)
 

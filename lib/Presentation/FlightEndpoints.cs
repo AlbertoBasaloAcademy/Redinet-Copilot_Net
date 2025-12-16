@@ -25,8 +25,50 @@ namespace NetAstroBookings.Presentation
 
       group.MapPost(string.Empty, CreateFlight);
       group.MapGet(string.Empty, ListFlights);
+      group.MapPost("/{flightId}/cancel", CancelFlight);
+      group.MapPost("/{flightId}/perform", PerformFlight);
 
       return endpoints;
+    }
+
+    private static async Task<IResult> CancelFlight(
+      [FromRoute] string flightId,
+      [FromServices] FlightService service)
+    {
+      var result = await service.CancelAsync(flightId);
+      return result switch
+      {
+        FlightService.FlightOperationResult.Success success =>
+          TypedResults.Ok(Map(success.Flight)),
+
+        FlightService.FlightOperationResult.NotFound =>
+          TypedResults.NotFound(),
+
+        FlightService.FlightOperationResult.Conflict conflict =>
+          TypedResults.Conflict(new { error = conflict.Error }),
+
+        _ => TypedResults.StatusCode(StatusCodes.Status500InternalServerError)
+      };
+    }
+
+    private static async Task<IResult> PerformFlight(
+      [FromRoute] string flightId,
+      [FromServices] FlightService service)
+    {
+      var result = await service.PerformAsync(flightId);
+      return result switch
+      {
+        FlightService.FlightOperationResult.Success success =>
+          TypedResults.Ok(Map(success.Flight)),
+
+        FlightService.FlightOperationResult.NotFound =>
+          TypedResults.NotFound(),
+
+        FlightService.FlightOperationResult.Conflict conflict =>
+          TypedResults.Conflict(new { error = conflict.Error }),
+
+        _ => TypedResults.StatusCode(StatusCodes.Status500InternalServerError)
+      };
     }
 
     private static async Task<IResult> ListFlights(
