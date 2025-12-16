@@ -26,5 +26,10 @@ namespace NetAstroBookings.Dtos
     /// Passenger email.
     /// </summary>
     public string PassengerEmail { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Final computed price for the booking.
+    /// </summary>
+    public decimal FinalPrice { get; set; }
   }
 }

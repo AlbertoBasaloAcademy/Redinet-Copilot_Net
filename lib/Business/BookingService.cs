@@ -99,16 +99,27 @@ namespace NetAstroBookings.Business
           return new CreateBookingResult.Conflict("flight capacity exceeded");
         }
 
+        var newCount = currentCount + 1;
+
+        var (discountRule, discountRate) = DetermineDiscount(newCount, capacity, flight.MinimumPassengers);
+        var finalPrice = flight.BasePrice * (1m - discountRate);
+
         var booking = new Booking
         {
           FlightId = flightId,
           PassengerName = validated.PassengerName,
-          PassengerEmail = validated.PassengerEmail
+          PassengerEmail = validated.PassengerEmail,
+          FinalPrice = finalPrice
         };
 
         var created = await _bookingRepository.AddAsync(booking);
 
-        var newCount = currentCount + 1;
+        _logger.LogInformation(
+          "Computed final price for flight {FlightId} using discount rule {DiscountRule}. FinalPrice={FinalPrice}",
+          flightId,
+          discountRule,
+          finalPrice);
+
         if (newCount == capacity && flight.State != FlightState.SOLD_OUT)
         {
           flight.State = FlightState.SOLD_OUT;
@@ -130,6 +141,31 @@ namespace NetAstroBookings.Business
       {
         gate.Release();
       }
+    }
+
+    private enum DiscountRule
+    {
+      LastSeat,
+      OneAwayFromMinimumPassengers,
+      Standard
+    }
+
+    private static (DiscountRule Rule, decimal DiscountRate) DetermineDiscount(
+      int newBookingCount,
+      int rocketCapacity,
+      int minimumPassengers)
+    {
+      if (newBookingCount == rocketCapacity)
+      {
+        return (DiscountRule.LastSeat, 0.0m);
+      }
+
+      if (newBookingCount == (minimumPassengers - 1))
+      {
+        return (DiscountRule.OneAwayFromMinimumPassengers, 0.3m);
+      }
+
+      return (DiscountRule.Standard, 0.1m);
     }
 
     /// <summary>

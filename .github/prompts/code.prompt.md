@@ -1,28 +1,33 @@
 ---
-agent: agent
+agent: Plan
 model: GPT-5.2 (Preview)
-description: 'Write the code for a feature based on its implementation plan.'
-argument-hint: 'Provide the feature implementation plan.'
+description: 'Write the code implementation plan for a feature based on its specification.'
+argument-hint: 'Provide the feature specification.'
 ---
 
 # Write Code Implementation for a Feature
 
 ## Task
 
-Write the code implementation for a prompted feature based on its implementation plan.
+Write the code implementation for a prompted feature based on its specification.
 
 Do not include any tests, only provide the code.
 
 ## Context
 
 - The specs file [{specId}.spec.md](/docs/specs/{specId}.spec.md) 
-- The plan file [{specId}.plan.md](/docs/specs/{specId}.plan.md) 
 - [/.github/instructions](../instructions) - Existing instruction files directory
 - [STRUCTURE.md](/docs/STRUCTURE.md) - Contains the technology stack and approved dependencies
 
 ## Steps
 
-- Read and analyze the implementation plan to understand the feature requirements.
+- Read and analyze the specification document to understand the feature requirements.
+
+- Review current project structure and previous related implementations for consistency.
+
+- Plan the code structure and components needed to implement the feature.
+
+- Commit and clean repository before starting the implementation. Create an isolated branch for the feature.
 
 - Write the code implementation in appropriate files and directories following project conventions.
 

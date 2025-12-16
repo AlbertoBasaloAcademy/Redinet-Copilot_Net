@@ -85,7 +85,8 @@ namespace NetAstroBookings.Persistence
         Id = booking.Id,
         FlightId = booking.FlightId,
         PassengerName = booking.PassengerName,
-        PassengerEmail = booking.PassengerEmail
+        PassengerEmail = booking.PassengerEmail,
+        FinalPrice = booking.FinalPrice
       };
     }
   }
