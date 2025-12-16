@@ -10,8 +10,8 @@ dotnet build
 dotnet run
 curl -X POST http://localhost:5058/rockets \
   -H "Content-Type: application/json" \      
-  -d '{"name":"Orion I","capacity":4,"range":"Moon"}'
-{"id":"r0001","name":"Orion I","capacity":4,"range":"Moon"}
+  -d '{"name":"Orion I","capacity":4,"speed":25000,"range":"MOON"}'
+{"id":"r0001","name":"Orion I","capacity":4,"speed":25000,"range":"MOON"}
 ```
 
 ---

@@ -3,37 +3,42 @@ using System;
 namespace NetAstroBookings.Models
 {
   /// <summary>
-  /// Posibles rangos/misiones de un cohete.
+  /// Supported mission ranges for a rocket.
   /// </summary>
   public enum RocketRange
   {
     LEO,
-    Moon,
-    Mars
+    MOON,
+    MARS
   }
 
   /// <summary>
-  /// Modelo de dominio que representa un cohete.
+  /// Domain model that represents a rocket.
   /// </summary>
   public class Rocket
   {
     /// <summary>
-    /// Identificador único asignado por el repositorio (por ejemplo "r0001").
+    /// Unique identifier assigned by the repository (for example "r0001").
     /// </summary>
     public string? Id { get; set; }
 
     /// <summary>
-    /// Nombre del cohete.
+    /// Rocket name.
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Capacidad (número de pasajeros).
+    /// Capacity (number of passengers).
     /// </summary>
     public int Capacity { get; set; }
 
     /// <summary>
-    /// Rango o destino del cohete.
+    /// Optional speed for the rocket.
+    /// </summary>
+    public int? Speed { get; set; }
+
+    /// <summary>
+    /// Rocket mission range.
     /// </summary>
     public RocketRange Range { get; set; }
   }

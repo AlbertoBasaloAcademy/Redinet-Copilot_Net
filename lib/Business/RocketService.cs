@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NetAstroBookings.Dtos;
 using NetAstroBookings.Models;
 using NetAstroBookings.Persistence;
@@ -7,54 +9,135 @@ using NetAstroBookings.Persistence;
 namespace NetAstroBookings.Business
 {
   /// <summary>
-  /// Servicio de negocio para operaciones relacionadas con <see cref="NetAstroBookings.Models.Rocket"/>.
-  /// Encapsula la lógica de validación y delega la persistencia al repositorio en memoria.
+  /// Business service for operations related to <see cref="Rocket"/>.
+  /// Encapsulates validation rules and orchestrates persistence via a repository abstraction.
   /// </summary>
   public class RocketService
   {
-    private readonly NetAstroBookings.Persistence.InMemoryRocketRepository _repository;
+    private readonly IRocketRepository _repository;
+    private readonly ILogger<RocketService> _logger;
 
     /// <summary>
-    /// Crea una nueva instancia de <see cref="RocketService"/>.
+    /// Creates a new instance of <see cref="RocketService"/>.
     /// </summary>
-    /// <param name="repository">Repositorio en memoria para persistir cohetes.</param>
-    public RocketService(NetAstroBookings.Persistence.InMemoryRocketRepository repository)
+    /// <param name="repository">Repository used to persist and query rockets.</param>
+    /// <param name="logger">Logger instance.</param>
+    public RocketService(IRocketRepository repository, ILogger<RocketService> logger)
     {
       _repository = repository;
+      _logger = logger;
     }
 
     /// <summary>
-    /// Valida los datos de entrada y crea un nuevo <see cref="NetAstroBookings.Models.Rocket"/>.
-    /// Lanza <see cref="ArgumentException"/> si los datos son inválidos.
+    /// Validates input data and creates a new <see cref="Rocket"/>.
     /// </summary>
     /// <param name="dto">DTO con los datos del cohete a crear.</param>
-    /// <returns>El cohete creado con su Id asignado.</returns>
-    public async Task<Rocket> CreateAsync(RocketDto dto)
+    /// <returns>A result describing either success or a validation failure.</returns>
+    public async Task<CreateRocketResult> CreateAsync(RocketDto dto)
     {
-      var range = ValidateDto(dto);
+      var validation = ValidateDto(dto);
+      if (validation is CreateRocketResult.ValidationFailed validationFailed)
+      {
+        _logger.LogWarning("Rocket validation failed: {Error}", validationFailed.Error);
+        return validationFailed;
+      }
+
+      var range = ((CreateRocketResult.Validated)validation).Range;
 
       var rocket = new Rocket
       {
         Name = dto.Name.Trim(),
         Capacity = dto.Capacity,
+        Speed = dto.Speed,
         Range = range
       };
 
-      return await _repository.AddAsync(rocket);
+      var created = await _repository.AddAsync(rocket);
+      _logger.LogInformation("Created rocket {RocketId}", created.Id);
+      return new CreateRocketResult.Success(created);
     }
 
-    private RocketRange ValidateDto(RocketDto dto)
+    /// <summary>
+    /// Returns all rockets.
+    /// </summary>
+    /// <returns>A snapshot list of all rockets.</returns>
+    public Task<IReadOnlyList<Rocket>> ListAsync()
+    {
+      return _repository.ListAsync();
+    }
+
+    /// <summary>
+    /// Retrieves a rocket by its identifier.
+    /// </summary>
+    /// <param name="id">Rocket identifier.</param>
+    /// <returns>A result describing either a found rocket or not found.</returns>
+    public async Task<GetRocketResult> GetByIdAsync(string id)
+    {
+      var rocket = await _repository.GetByIdAsync(id);
+      return rocket is null ? new GetRocketResult.NotFound() : new GetRocketResult.Found(rocket);
+    }
+
+    /// <summary>
+    /// Result type for create operations.
+    /// </summary>
+    public abstract record CreateRocketResult
+    {
+      /// <summary>
+      /// Internal representation for validated input.
+      /// </summary>
+      public sealed record Validated(RocketRange Range) : CreateRocketResult;
+
+      /// <summary>
+      /// Validation failure outcome.
+      /// </summary>
+      public sealed record ValidationFailed(string Error) : CreateRocketResult;
+
+      /// <summary>
+      /// Successful creation outcome.
+      /// </summary>
+      public sealed record Success(Rocket Rocket) : CreateRocketResult;
+    }
+
+    /// <summary>
+    /// Result type for get-by-id operations.
+    /// </summary>
+    public abstract record GetRocketResult
+    {
+      /// <summary>
+      /// Rocket not found.
+      /// </summary>
+      public sealed record NotFound : GetRocketResult;
+
+      /// <summary>
+      /// Rocket found.
+      /// </summary>
+      public sealed record Found(Rocket Rocket) : GetRocketResult;
+    }
+
+    private CreateRocketResult ValidateDto(RocketDto dto)
     {
       if (string.IsNullOrWhiteSpace(dto.Name))
-        throw new ArgumentException("Name is required", nameof(dto.Name));
+      {
+        return new CreateRocketResult.ValidationFailed("Name is required");
+      }
 
       if (dto.Capacity <= 0 || dto.Capacity > 10)
-        throw new ArgumentException("Capacity must be > 0 and <= 10", nameof(dto.Capacity));
+      {
+        return new CreateRocketResult.ValidationFailed("Capacity must be > 0 and <= 10");
+      }
 
-      if (!Enum.TryParse<RocketRange>(dto.Range, true, out var range))
-        throw new ArgumentException("Range must be one of: LEO, Moon, Mars", nameof(dto.Range));
+      var rangeText = dto.Range;
+      if (string.IsNullOrWhiteSpace(rangeText))
+      {
+        rangeText = "LEO";
+      }
 
-      return range;
+      if (!Enum.TryParse<RocketRange>(rangeText, true, out var range))
+      {
+        return new CreateRocketResult.ValidationFailed("Range must be one of: LEO, MOON, MARS");
+      }
+
+      return new CreateRocketResult.Validated(range);
     }
   }
 }

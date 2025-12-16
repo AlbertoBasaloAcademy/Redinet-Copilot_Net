@@ -8,6 +8,12 @@ Structure Document for AstroBookings
 
 The system exposes a RESTful HTTP/JSON API to manage **Rockets**, **Flights**, and **Bookings**, enforcing capacity, pricing/discount rules, and flight state transitions.
 
+Implemented Rocket endpoints:
+
+- `POST /rockets` creates a rocket.
+- `GET /rockets` lists all rockets.
+- `GET /rockets/{id}` retrieves a rocket by id.
+
 ## Architecture
 
 ### Architecture style
@@ -26,6 +32,7 @@ The system exposes a RESTful HTTP/JSON API to manage **Rockets**, **Flights**, a
   - DTOs live in `lib/Dtos` (request/response).
   - Domain models live in `lib/Models`.
   - Persistence repositories live in `lib/Persistence`.
+  - Repository abstractions live alongside persistence in `lib/Persistence` (e.g., `IRocketRepository`).
 - **Error handling**:
   - Business should not throw for expected outcomes (validation, not found, conflicts). It should return explicit results.
   - Presentation maps Business outcomes to HTTP (`400/404/409`, etc.).
@@ -38,6 +45,18 @@ The system exposes a RESTful HTTP/JSON API to manage **Rockets**, **Flights**, a
 - **Logging**: use `ILogger<T>` with structured templates. Log state transitions and workflow triggers (notifications/refunds) at `Information`, validation/conflicts at `Warning`, unexpected failures at `Error`.
 - **Configuration**: use `appsettings.json` + `appsettings.{Environment}.json` and the options pattern for strongly-typed settings.
 - **Concurrency**: repositories must be safe for concurrent access (e.g., `ConcurrentDictionary` + atomic operations).
+
+### Rockets (current shape)
+
+- **Domain model**: `Rocket`
+  - `Id` (string, assigned by repository; deterministic sequential IDs like `r0001`)
+  - `Name` (required)
+  - `Capacity` (required, `<= 10`)
+  - `Speed` (optional)
+  - `Range` (enum: `LEO`, `MOON`, `MARS`)
+- **DTOs**
+  - Create request: `RocketDto` (uses `range` string with default `LEO`)
+  - Response: `RocketResponseDto` (includes optional `speed`)
 
 ### Folder Structure
 
@@ -131,4 +150,4 @@ Workflow conventions:
 - Repositories are deterministic (IDs) and safe for concurrent access.
 - New dependencies require an explicit decision (keep the workshop surface minimal).
 
-> End of STRUCTURE document for AstroBookings, last updated on 2025-12-15.
+> End of STRUCTURE document for AstroBookings, last updated on 2025-12-16.

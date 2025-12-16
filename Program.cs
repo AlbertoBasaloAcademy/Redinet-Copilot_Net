@@ -1,8 +1,9 @@
 using NetAstroBookings.Presentation;
+using NetAstroBookings.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<NetAstroBookings.Persistence.InMemoryRocketRepository>();
+builder.Services.AddSingleton<IRocketRepository, InMemoryRocketRepository>();
 builder.Services.AddScoped<NetAstroBookings.Business.RocketService>();
 
 var app = builder.Build();

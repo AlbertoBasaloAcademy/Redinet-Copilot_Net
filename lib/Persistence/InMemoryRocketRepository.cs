@@ -1,30 +1,74 @@
-using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using NetAstroBookings.Models;
-using System;
 
 namespace NetAstroBookings.Persistence
 {
   /// <summary>
-  /// Repositorio simple en memoria que asigna un Id secuencial al añadir cohetes.
-  /// No es thread-safe para operaciones compuestas, pero usa <see cref="ConcurrentDictionary{TKey,TValue}"/>.
+  /// In-memory repository that assigns deterministic sequential IDs and supports concurrent requests.
   /// </summary>
-  public class InMemoryRocketRepository
+  public class InMemoryRocketRepository : IRocketRepository
   {
     private readonly ConcurrentDictionary<string, Rocket> _store = new();
+    private long _nextId;
 
     /// <summary>
-    /// Añade un cohete al almacén en memoria y le asigna un identificador.
+    /// Adds a rocket to the in-memory store and assigns an identifier.
     /// </summary>
-    /// <param name="rocket">Instancia del cohete sin Id.</param>
-    /// <returns>La misma instancia con la propiedad <see cref="Rocket.Id"/> asignada.</returns>
+    /// <param name="rocket">Rocket instance without an Id.</param>
+    /// <returns>The persisted rocket with <see cref="Rocket.Id"/> assigned.</returns>
     public Task<Rocket> AddAsync(Rocket rocket)
     {
-      var count = _store.Count + 1;
-      var id = "r" + count.ToString("D4");
-      rocket.Id = id;
-      _store[id] = rocket;
-      return Task.FromResult(rocket);
+      var id = "r" + Interlocked.Increment(ref _nextId).ToString("D4");
+      var persisted = Clone(rocket);
+      persisted.Id = id;
+
+      _store[id] = persisted;
+
+      return Task.FromResult(Clone(persisted));
+    }
+
+    /// <summary>
+    /// Returns a snapshot list of all rockets.
+    /// </summary>
+    public Task<IReadOnlyList<Rocket>> ListAsync()
+    {
+      var snapshot = _store.Values
+        .Select(Clone)
+        .OrderBy(r => r.Id, StringComparer.Ordinal)
+        .ToList();
+
+      return Task.FromResult<IReadOnlyList<Rocket>>(snapshot);
+    }
+
+    /// <summary>
+    /// Retrieves a rocket by its identifier.
+    /// </summary>
+    /// <param name="id">Rocket identifier.</param>
+    /// <returns>The rocket if found; otherwise <c>null</c>.</returns>
+    public Task<Rocket?> GetByIdAsync(string id)
+    {
+      if (string.IsNullOrWhiteSpace(id))
+      {
+        return Task.FromResult<Rocket?>(null);
+      }
+
+      return Task.FromResult(_store.TryGetValue(id, out var rocket) ? Clone(rocket) : null);
+    }
+
+    private static Rocket Clone(Rocket rocket)
+    {
+      return new Rocket
+      {
+        Id = rocket.Id,
+        Name = rocket.Name,
+        Capacity = rocket.Capacity,
+        Speed = rocket.Speed,
+        Range = rocket.Range
+      };
     }
   }
 }
