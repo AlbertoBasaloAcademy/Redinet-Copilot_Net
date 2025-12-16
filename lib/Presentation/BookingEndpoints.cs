@@ -59,7 +59,8 @@ namespace NetAstroBookings.Presentation
         Id = booking.Id ?? string.Empty,
         FlightId = booking.FlightId,
         PassengerName = booking.PassengerName,
-        PassengerEmail = booking.PassengerEmail
+        PassengerEmail = booking.PassengerEmail,
+        FinalPrice = booking.FinalPrice
       };
     }
   }

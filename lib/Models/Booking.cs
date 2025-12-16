@@ -27,5 +27,11 @@ namespace NetAstroBookings.Models
     /// Passenger email.
     /// </summary>
     public string PassengerEmail { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Final computed price for this booking after applying exactly one discount.
+    /// Computed at creation time from the linked flight's base price.
+    /// </summary>
+    public decimal FinalPrice { get; set; }
   }
 }
