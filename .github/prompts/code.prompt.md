@@ -21,17 +21,22 @@ Do not include any tests, only provide the code.
 
 ## Steps
 
+### Pre-coding steps (planning)
+
 - Read and analyze the specification document to understand the feature requirements.
 
 - Review current project structure and previous related implementations for consistency.
 
 - Plan the code structure and components needed to implement the feature.
 
+### Coding steps
 - Commit and clean repository before starting the implementation. Create an isolated branch for the feature.
 
 - Write the code implementation in appropriate files and directories following project conventions.
 
 - Don not wait for approval or feedback, proceed directly to implementation.
+
+### Post-coding steps
 
 - Update the [STRUCTURE.md](/docs/STRUCTURE.md) document if new dependencies or significant architectural changes are introduced.
 
