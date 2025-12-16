@@ -1,5 +1,6 @@
 using NetAstroBookings.Presentation;
 using NetAstroBookings.Persistence;
+using NetAstroBookings.Business;
 using System;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,8 @@ builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<IRocketRepository, InMemoryRocketRepository>();
 builder.Services.AddSingleton<IFlightRepository, InMemoryFlightRepository>();
 builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
+
+builder.Services.AddSingleton<IFlightOperationGate, FlightOperationGate>();
 
 builder.Services.AddScoped<NetAstroBookings.Business.RocketService>();
 builder.Services.AddScoped<NetAstroBookings.Business.FlightService>();
