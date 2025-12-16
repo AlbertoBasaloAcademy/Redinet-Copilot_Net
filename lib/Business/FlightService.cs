@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NetAstroBookings.Dtos;
@@ -77,6 +79,54 @@ namespace NetAstroBookings.Business
     }
 
     /// <summary>
+    /// Lists only flights whose <see cref="Flight.LaunchDate"/> is strictly greater than the current time,
+    /// and optionally filters by flight state.
+    /// </summary>
+    /// <param name="state">Optional state filter (case-insensitive).</param>
+    /// <returns>A result describing either success or a validation failure.</returns>
+    public async Task<ListFlightsResult> ListFutureFlightsAsync(string? state)
+    {
+      FlightState? parsedState = null;
+
+      if (state is not null)
+      {
+        if (string.IsNullOrWhiteSpace(state))
+        {
+          const string error = "state must be a valid flight state";
+          _logger.LogWarning("Invalid flight state filter value: {State}", state);
+          return new ListFlightsResult.ValidationFailed(error);
+        }
+
+        var trimmed = state.Trim();
+        if (!Enum.TryParse<FlightState>(trimmed, true, out var parsed))
+        {
+          const string error = "state must be one of: SCHEDULED, CONFIRMED, SOLD_OUT, CANCELLED, DONE";
+          _logger.LogWarning("Invalid flight state filter value: {State}", trimmed);
+          return new ListFlightsResult.ValidationFailed(error);
+        }
+
+        parsedState = parsed;
+      }
+
+      var now = _timeProvider.GetUtcNow();
+
+      var allFlights = await _flightRepository.ListAsync();
+      var futureFlights = allFlights
+        .Where(f => f.LaunchDate > now)
+        .Where(f => parsedState is null || f.State == parsedState.Value)
+        .OrderBy(f => f.LaunchDate)
+        .ThenBy(f => f.Id, StringComparer.Ordinal)
+        .ToList();
+
+      _logger.LogInformation(
+        "Listed future flights. Count={Count} StateFilter={StateFilter}",
+        futureFlights.Count,
+        parsedState?.ToString() ?? "(none)");
+
+      return new ListFlightsResult.Success(futureFlights);
+    }
+
+    /// <summary>
     /// Result type for flight create operations.
     /// </summary>
     public abstract record CreateFlightResult
@@ -100,6 +150,22 @@ namespace NetAstroBookings.Business
       /// Successful creation outcome.
       /// </summary>
       public sealed record Success(Flight Flight) : CreateFlightResult;
+    }
+
+    /// <summary>
+    /// Result type for list operations.
+    /// </summary>
+    public abstract record ListFlightsResult
+    {
+      /// <summary>
+      /// Validation failure outcome.
+      /// </summary>
+      public sealed record ValidationFailed(string Error) : ListFlightsResult;
+
+      /// <summary>
+      /// Successful list outcome.
+      /// </summary>
+      public sealed record Success(IReadOnlyList<Flight> Flights) : ListFlightsResult;
     }
 
     private CreateFlightResult ValidateDto(CreateFlightDto dto)
