@@ -27,9 +27,15 @@ Do not include any tests, only provide the code.
 
 - Plan the code structure and components needed to implement the feature.
 
+- Commit and clean repository before starting the implementation. Create an isolated branch for the feature.
+
 - Write the code implementation in appropriate files and directories following project conventions.
 
+- Don not wait for approval or feedback, proceed directly to implementation.
+
 - Update the [STRUCTURE.md](/docs/STRUCTURE.md) document if new dependencies or significant architectural changes are introduced.
+
+- Commit the changes with a descriptive message indicating the feature implemented.
 
 ## Validation
 
@@ -37,3 +43,4 @@ Do not include any tests, only provide the code.
   - [ ] The code builds/compiles without errors
   - [ ] No tests are included, no need testing at this point  
   - [ ] Structure document is updated if necessary
+  - [ ] Feature brach is clean and ready for merging
