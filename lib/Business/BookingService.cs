@@ -1,0 +1,196 @@
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using NetAstroBookings.Dtos;
+using NetAstroBookings.Models;
+using NetAstroBookings.Persistence;
+
+namespace NetAstroBookings.Business
+{
+  /// <summary>
+  /// Business service for operations related to <see cref="Booking"/>.
+  /// Encapsulates validation rules and orchestrates persistence via repository abstractions.
+  /// </summary>
+  public class BookingService
+  {
+    private readonly IBookingRepository _bookingRepository;
+    private readonly IFlightRepository _flightRepository;
+    private readonly IRocketRepository _rocketRepository;
+    private readonly ILogger<BookingService> _logger;
+
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _flightGates = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Creates a new instance of <see cref="BookingService"/>.
+    /// </summary>
+    /// <param name="bookingRepository">Repository used to persist and query bookings.</param>
+    /// <param name="flightRepository">Repository used to load and update flights.</param>
+    /// <param name="rocketRepository">Repository used to load rocket capacity.</param>
+    /// <param name="logger">Logger instance.</param>
+    public BookingService(
+      IBookingRepository bookingRepository,
+      IFlightRepository flightRepository,
+      IRocketRepository rocketRepository,
+      ILogger<BookingService> logger)
+    {
+      _bookingRepository = bookingRepository;
+      _flightRepository = flightRepository;
+      _rocketRepository = rocketRepository;
+      _logger = logger;
+    }
+
+    /// <summary>
+    /// Validates input data and creates a booking for a specific flight.
+    /// Enforces flight-state rules and capacity based on the linked rocket.
+    /// </summary>
+    /// <param name="flightId">Flight identifier.</param>
+    /// <param name="dto">DTO with passenger information.</param>
+    /// <returns>A result describing either success, a validation failure, not found, or a conflict.</returns>
+    public async Task<CreateBookingResult> CreateAsync(string flightId, CreateBookingDto dto)
+    {
+      var validation = ValidateDto(flightId, dto);
+      if (validation is not CreateBookingResult.Validated validated)
+      {
+        if (validation is CreateBookingResult.ValidationFailed failed)
+        {
+          _logger.LogWarning("Booking validation failed: {Error}", failed.Error);
+        }
+
+        return validation;
+      }
+
+      var gate = _flightGates.GetOrAdd(flightId, _ => new SemaphoreSlim(1, 1));
+      await gate.WaitAsync();
+
+      try
+      {
+        var flight = await _flightRepository.GetByIdAsync(flightId);
+        if (flight is null)
+        {
+          return new CreateBookingResult.FlightNotFound();
+        }
+
+        if (flight.State is FlightState.CANCELLED or FlightState.SOLD_OUT)
+        {
+          _logger.LogWarning("Rejected booking for flight {FlightId} due to state {State}", flightId, flight.State);
+          return new CreateBookingResult.Conflict("flight is not bookable");
+        }
+
+        var rocket = await _rocketRepository.GetByIdAsync(flight.RocketId);
+        if (rocket is null)
+        {
+          _logger.LogError("Rocket {RocketId} not found for flight {FlightId}", flight.RocketId, flightId);
+          return new CreateBookingResult.UnexpectedFailure("rocket not found for flight");
+        }
+
+        var capacity = rocket.Capacity;
+        var currentCount = await _bookingRepository.CountByFlightIdAsync(flightId);
+
+        if (currentCount >= capacity)
+        {
+          _logger.LogWarning(
+            "Rejected booking for flight {FlightId} due to capacity. Current={Current} Capacity={Capacity}",
+            flightId,
+            currentCount,
+            capacity);
+
+          return new CreateBookingResult.Conflict("flight capacity exceeded");
+        }
+
+        var booking = new Booking
+        {
+          FlightId = flightId,
+          PassengerName = validated.PassengerName,
+          PassengerEmail = validated.PassengerEmail
+        };
+
+        var created = await _bookingRepository.AddAsync(booking);
+
+        var newCount = currentCount + 1;
+        if (newCount == capacity && flight.State != FlightState.SOLD_OUT)
+        {
+          flight.State = FlightState.SOLD_OUT;
+
+          var updated = await _flightRepository.UpdateAsync(flight);
+          if (updated is null)
+          {
+            _logger.LogError("Failed to update flight {FlightId} to SOLD_OUT", flightId);
+            return new CreateBookingResult.UnexpectedFailure("failed to transition flight to SOLD_OUT");
+          }
+
+          _logger.LogInformation("Flight {FlightId} transitioned to SOLD_OUT", flightId);
+        }
+
+        _logger.LogInformation("Created booking {BookingId} for flight {FlightId}", created.Id, flightId);
+        return new CreateBookingResult.Success(created);
+      }
+      finally
+      {
+        gate.Release();
+      }
+    }
+
+    /// <summary>
+    /// Result type for booking create operations.
+    /// </summary>
+    public abstract record CreateBookingResult
+    {
+      /// <summary>
+      /// Internal representation for validated input.
+      /// </summary>
+      public sealed record Validated(string PassengerName, string PassengerEmail) : CreateBookingResult;
+
+      /// <summary>
+      /// Validation failure outcome.
+      /// </summary>
+      public sealed record ValidationFailed(string Error) : CreateBookingResult;
+
+      /// <summary>
+      /// Outcome when the referenced flight does not exist.
+      /// </summary>
+      public sealed record FlightNotFound : CreateBookingResult;
+
+      /// <summary>
+      /// Conflict outcome when booking cannot be created (state/capacity).
+      /// </summary>
+      public sealed record Conflict(string Error) : CreateBookingResult;
+
+      /// <summary>
+      /// Unexpected failure outcome.
+      /// </summary>
+      public sealed record UnexpectedFailure(string Error) : CreateBookingResult;
+
+      /// <summary>
+      /// Successful booking creation outcome.
+      /// </summary>
+      public sealed record Success(Booking Booking) : CreateBookingResult;
+    }
+
+    private static CreateBookingResult ValidateDto(string flightId, CreateBookingDto dto)
+    {
+      if (string.IsNullOrWhiteSpace(flightId))
+      {
+        return new CreateBookingResult.FlightNotFound();
+      }
+
+      if (dto is null)
+      {
+        return new CreateBookingResult.ValidationFailed("request body is required");
+      }
+
+      if (string.IsNullOrWhiteSpace(dto.PassengerName))
+      {
+        return new CreateBookingResult.ValidationFailed("passengerName is required");
+      }
+
+      if (string.IsNullOrWhiteSpace(dto.PassengerEmail))
+      {
+        return new CreateBookingResult.ValidationFailed("passengerEmail is required");
+      }
+
+      return new CreateBookingResult.Validated(dto.PassengerName.Trim(), dto.PassengerEmail.Trim());
+    }
+  }
+}

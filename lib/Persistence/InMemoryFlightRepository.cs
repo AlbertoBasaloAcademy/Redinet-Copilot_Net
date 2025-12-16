@@ -61,6 +61,37 @@ namespace NetAstroBookings.Persistence
       return Task.FromResult(_store.TryGetValue(id, out var flight) ? Clone(flight) : null);
     }
 
+    /// <summary>
+    /// Updates an existing flight.
+    /// </summary>
+    /// <param name="flight">Flight instance with an existing <see cref="Flight.Id"/>.</param>
+    /// <returns>The updated flight if found; otherwise <c>null</c>.</returns>
+    public Task<Flight?> UpdateAsync(Flight flight)
+    {
+      if (flight is null)
+      {
+        return Task.FromResult<Flight?>(null);
+      }
+
+      var id = flight.Id;
+      if (string.IsNullOrWhiteSpace(id))
+      {
+        return Task.FromResult<Flight?>(null);
+      }
+
+      if (!_store.ContainsKey(id))
+      {
+        return Task.FromResult<Flight?>(null);
+      }
+
+      var persisted = Clone(flight);
+      persisted.Id = id;
+
+      _store[id] = persisted;
+
+      return Task.FromResult<Flight?>(Clone(persisted));
+    }
+
     private static Flight Clone(Flight flight)
     {
       return new Flight

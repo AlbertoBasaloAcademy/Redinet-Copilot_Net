@@ -28,5 +28,12 @@ namespace NetAstroBookings.Persistence
     /// <param name="id">Flight identifier.</param>
     /// <returns>The flight if found; otherwise <c>null</c>.</returns>
     Task<Flight?> GetByIdAsync(string id);
+
+    /// <summary>
+    /// Updates an existing flight.
+    /// </summary>
+    /// <param name="flight">Flight instance with an existing <see cref="Flight.Id"/>.</param>
+    /// <returns>The updated flight if found; otherwise <c>null</c>.</returns>
+    Task<Flight?> UpdateAsync(Flight flight);
   }
 }
