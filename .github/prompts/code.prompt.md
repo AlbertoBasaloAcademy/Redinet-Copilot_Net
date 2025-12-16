@@ -29,8 +29,11 @@ Do not include any tests, only provide the code.
 
 - Write the code implementation in appropriate files and directories following project conventions.
 
+- Update the [STRUCTURE.md](/docs/STRUCTURE.md) document if new dependencies or significant architectural changes are introduced.
+
 ## Validation
 
 - Ensure the code implementation is complete and is syntactically correct
   - [ ] The code builds/compiles without errors
   - [ ] No tests are included, no need testing at this point  
+  - [ ] Structure document is updated if necessary
