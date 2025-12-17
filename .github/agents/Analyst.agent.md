@@ -1,6 +1,6 @@
 ---
 description: 'A Software Analyst, that generates a product requirements document with system functional and technical needs.'
-model: GPT-5.2 (Preview)
+model: GPT-5.2 (copilot)
 tools: ['read/problems', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'web/fetch', 'todo']
 handoffs: 
   - label: Start Design

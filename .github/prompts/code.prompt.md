@@ -1,6 +1,6 @@
 ---
 agent: Plan
-model: GPT-5.2 (Preview)
+model: GPT-5.2 (copilot)
 description: 'Write the code implementation plan for a feature based on its specification.'
 argument-hint: 'Provide the feature specification.'
 ---
