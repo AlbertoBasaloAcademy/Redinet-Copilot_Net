@@ -51,15 +51,9 @@ namespace NetAstroBookings.Business
     /// <returns>A result describing either success, a validation failure, not found, or a conflict.</returns>
     public async Task<CreateBookingResult> CreateAsync(string flightId, CreateBookingDto dto)
     {
-      var validation = ValidateDto(flightId, dto);
-      if (validation is not CreateBookingResult.Validated validated)
+      if (!TryValidateCreateBookingRequest(flightId, dto, out var validated, out var validationFailure))
       {
-        if (validation is CreateBookingResult.ValidationFailed failed)
-        {
-          _logger.LogWarning("Booking validation failed: {Error}", failed.Error);
-        }
-
-        return validation;
+        return validationFailure!;
       }
 
       await using var gate = await _operationGate.AcquireAsync(flightId);
@@ -70,15 +64,10 @@ namespace NetAstroBookings.Business
         return new CreateBookingResult.FlightNotFound();
       }
 
-      if (flight.State is FlightState.CANCELLED or FlightState.SOLD_OUT or FlightState.DONE)
+      var notBookable = RejectIfNotBookable(flightId, flight);
+      if (notBookable is not null)
       {
-        _logger.LogWarning(
-          "Rejected booking for flight {FlightId} due to state {State}. Reason={Reason}",
-          flightId,
-          flight.State,
-          "flight is not bookable");
-
-        return new CreateBookingResult.Conflict("flight is not bookable");
+        return notBookable;
       }
 
       var rocket = await _rocketRepository.GetByIdAsync(flight.RocketId);
@@ -91,22 +80,101 @@ namespace NetAstroBookings.Business
       var capacity = rocket.Capacity;
       var currentCount = await _bookingRepository.CountByFlightIdAsync(flightId);
 
-      if (currentCount >= capacity)
+      var capacityExceeded = RejectIfCapacityExceeded(flightId, currentCount, capacity);
+      if (capacityExceeded is not null)
       {
-        _logger.LogWarning(
-          "Rejected booking for flight {FlightId} due to capacity. Current={Current} Capacity={Capacity}",
-          flightId,
-          currentCount,
-          capacity);
-
-        return new CreateBookingResult.Conflict("flight capacity exceeded");
+        return capacityExceeded;
       }
 
       var newCount = currentCount + 1;
 
       var (discountRule, discountRate) = DetermineDiscount(newCount, capacity, flight.MinimumPassengers);
-      var finalPrice = flight.BasePrice * (1m - discountRate);
+      var finalPrice = ComputeFinalPrice(flight.BasePrice, discountRate);
 
+      var created = await CreateBookingAsync(flightId, validated!, finalPrice);
+
+      _logger.LogInformation(
+        "Computed final price for flight {FlightId} using discount rule {DiscountRule}. FinalPrice={FinalPrice}",
+        flightId,
+        discountRule,
+        finalPrice);
+
+      var transitionFailure = await TryTransitionFlightStateAsync(flightId, flight, newCount, capacity);
+      if (transitionFailure is not null)
+      {
+        return transitionFailure;
+      }
+
+      _logger.LogInformation("Created booking {BookingId} for flight {FlightId}", created.Id, flightId);
+      return new CreateBookingResult.Success(created);
+    }
+
+    private bool TryValidateCreateBookingRequest(
+      string flightId,
+      CreateBookingDto dto,
+      out CreateBookingResult.Validated? validated,
+      out CreateBookingResult? validationFailure)
+    {
+      var validation = ValidateDto(flightId, dto);
+      if (validation is CreateBookingResult.Validated ok)
+      {
+        validated = ok;
+        validationFailure = null;
+        return true;
+      }
+
+      if (validation is CreateBookingResult.ValidationFailed failed)
+      {
+        _logger.LogWarning("Booking validation failed: {Error}", failed.Error);
+      }
+
+      validated = null;
+      validationFailure = validation;
+      return false;
+    }
+
+    private CreateBookingResult? RejectIfNotBookable(string flightId, Flight flight)
+    {
+      if (flight.State is not (FlightState.CANCELLED or FlightState.SOLD_OUT or FlightState.DONE))
+      {
+        return null;
+      }
+
+      _logger.LogWarning(
+        "Rejected booking for flight {FlightId} due to state {State}. Reason={Reason}",
+        flightId,
+        flight.State,
+        "flight is not bookable");
+
+      return new CreateBookingResult.Conflict("flight is not bookable");
+    }
+
+    private CreateBookingResult? RejectIfCapacityExceeded(string flightId, int currentCount, int capacity)
+    {
+      if (currentCount < capacity)
+      {
+        return null;
+      }
+
+      _logger.LogWarning(
+        "Rejected booking for flight {FlightId} due to capacity. Current={Current} Capacity={Capacity}",
+        flightId,
+        currentCount,
+        capacity);
+
+      return new CreateBookingResult.Conflict("flight capacity exceeded");
+    }
+
+    private static decimal ComputeFinalPrice(decimal basePrice, decimal discountRate)
+    {
+      return basePrice * (1m - discountRate);
+    }
+
+    private async Task<Booking> CreateBookingAsync(
+      string flightId,
+      CreateBookingResult.Validated validated,
+      decimal finalPrice)
+    {
       var booking = new Booking
       {
         FlightId = flightId,
@@ -115,64 +183,76 @@ namespace NetAstroBookings.Business
         FinalPrice = finalPrice
       };
 
-      var created = await _bookingRepository.AddAsync(booking);
+      return await _bookingRepository.AddAsync(booking);
+    }
 
-      _logger.LogInformation(
-        "Computed final price for flight {FlightId} using discount rule {DiscountRule}. FinalPrice={FinalPrice}",
-        flightId,
-        discountRule,
-        finalPrice);
-
-      var fromState = flight.State;
-      var toState = fromState;
-
+    private static FlightState DetermineNextState(
+      FlightState fromState,
+      int newCount,
+      int capacity,
+      int minimumPassengers)
+    {
       if (newCount >= capacity && fromState != FlightState.SOLD_OUT)
       {
-        toState = FlightState.SOLD_OUT;
-      }
-      else if (newCount >= flight.MinimumPassengers && fromState == FlightState.SCHEDULED)
-      {
-        toState = FlightState.CONFIRMED;
+        return FlightState.SOLD_OUT;
       }
 
-      if (toState != fromState)
+      if (newCount >= minimumPassengers && fromState == FlightState.SCHEDULED)
       {
-        flight.State = toState;
+        return FlightState.CONFIRMED;
+      }
 
-        var updated = await _flightRepository.UpdateAsync(flight);
-        if (updated is null)
-        {
-          _logger.LogError(
-            "Failed to update flight {FlightId} from {FromState} to {ToState}",
-            flightId,
-            fromState,
-            toState);
+      return fromState;
+    }
 
-          return new CreateBookingResult.UnexpectedFailure("failed to transition flight state");
-        }
+    private async Task<CreateBookingResult?> TryTransitionFlightStateAsync(
+      string flightId,
+      Flight flight,
+      int newCount,
+      int capacity)
+    {
+      var fromState = flight.State;
+      var toState = DetermineNextState(fromState, newCount, capacity, flight.MinimumPassengers);
 
-        _logger.LogInformation(
-          "Flight {FlightId} transitioned from {FromState} to {ToState}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
+      if (toState == fromState)
+      {
+        return null;
+      }
+
+      flight.State = toState;
+
+      var updated = await _flightRepository.UpdateAsync(flight);
+      if (updated is null)
+      {
+        _logger.LogError(
+          "Failed to update flight {FlightId} from {FromState} to {ToState}",
           flightId,
           fromState,
-          toState,
+          toState);
+
+        return new CreateBookingResult.UnexpectedFailure("failed to transition flight state");
+      }
+
+      _logger.LogInformation(
+        "Flight {FlightId} transitioned from {FromState} to {ToState}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
+        flightId,
+        fromState,
+        toState,
+        newCount,
+        flight.MinimumPassengers,
+        capacity);
+
+      if (toState == FlightState.CONFIRMED)
+      {
+        _logger.LogInformation(
+          "Triggering confirmation notification workflow for flight {FlightId}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
+          flightId,
           newCount,
           flight.MinimumPassengers,
           capacity);
-
-        if (toState == FlightState.CONFIRMED)
-        {
-          _logger.LogInformation(
-            "Triggering confirmation notification workflow for flight {FlightId}. BookingCount={BookingCount} MinimumPassengers={MinimumPassengers} Capacity={Capacity}",
-            flightId,
-            newCount,
-            flight.MinimumPassengers,
-            capacity);
-        }
       }
 
-      _logger.LogInformation("Created booking {BookingId} for flight {FlightId}", created.Id, flightId);
-      return new CreateBookingResult.Success(created);
+      return null;
     }
 
     /// <summary>
